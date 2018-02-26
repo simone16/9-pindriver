@@ -94,7 +94,7 @@ class ParallelAdapter:
             sleep( self.strobe_duration)
             gpio.output( self.probe, gpio.HIGH)
             # Wait for the printer to be ready again.
-            while ( gpio.input( self.busy) == gpio.HIGH)
+            while ( gpio.input( self.busy) == gpio.HIGH):
                 sleep( self.busy_polling_delay)
 
     def write_string(self, message):
