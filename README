@@ -1,0 +1,10 @@
+This driver implements the ESC/P standard for communicating with
+9-pin head impact mactrix printers via an emulated parallel port.
+It has been tested against a MT81 Tally printer using a raspberrypi
+host.
+Parallel port emulation hardware was provided by the broadcomm gpio
+module and an external 8-bit gpio expander (PCF8574A) connected via
+the smbus (I2c module).
+
+Author: Simone Pilon <wertyseek@gmail.com>
+Creation: 25-02-2018
