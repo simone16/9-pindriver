@@ -50,11 +50,14 @@ class ParallelAdapter:
     RS = 30     #Record Separator
     US  = 31    #Unit Separator
 
+
     def __init__(self):
         # Define timings:
         self.i2c_delay = 0.001          # Delay between i2c comunication and valid data on device [S].
         self.strobe_duration = 0.01     # Width of the strobe active pulse.
         self.busy_polling_delay = 0.01  # Delay between polls of busy.
+        # Define character sequences:
+        NL = ( self.CR)                 # New Line (default is hardware autofeed enabled)
         # Init i2c:
         self.i2c_address = 56           # Address of GPIO expander (all address pins grounded).
         self.i2c_bus = smbus.SMBus(1)   # i2c bus connected to GPIO expander.
@@ -82,7 +85,7 @@ class ParallelAdapter:
 
     def putchar(self, *values):
         """Sends the values via the parallel bus.
-    The parallel bus emulation is implemented in this function.
+    The parallel bus emulation is implemented mostly in this function.
     values : int
         8-bit values to transmit."""
         for val in values:
@@ -114,7 +117,7 @@ class ParallelAdapter:
         """Writes a string message, newline signal is appended automatically.
     message : string"""
         self.write_string(message)
-        self.putchar( self.CR, self.LF)
+        self.putchar( *(self.NL))
 
     def write_file(self, filename):
         """Writes characters from a file.
@@ -137,6 +140,84 @@ class ParallelAdapter:
     n : int
         1 <= n <= 255"""
         self.putchar( self.ESC, ord('l'), n)
+
+    def set_page_length_lines(self, n):
+        """Set the page length to n lines in the current
+    line spacing.
+    n : int
+        1 <= n <= 127"""
+        self.putchar( self.ESC, ord('C'), n)
+
+    def set_page_length_inches(self, n):
+        """Set the page length to n inches.
+    n : int
+        1 <= n <= 22"""
+        self.putchar( self.ESC, ord('C'), self.NUL, n)
+
+    def set_bottom_margin(self, n):
+        """Set the bottom margin on continuous paper to n lines
+    from the top-of-form position on the next page.
+    n : int
+        1 <= n <= 127"""
+        self.putchar( self.ESC, ord('N'), n)
+
+    def unset_vertical_margin(self):
+        """Cancel top and bottom margin setting
+    (Cancel skip-over-perforation)."""
+        self.putchar( self.ESC, ord('O'))
+
+    def set_autofeed_method(self, method):
+        """Set autofeed.
+    method : string
+        'hard' = Grounds AUTOF pin, the printer will
+                perform a LF at every CR.
+                If '\\n' is expanded to CR+LF, line spacing will be double.
+        'soft' = The adapter appends LF to CR when calling new_line().
+                If '\\n' is expanded to CR only, the printer won't feed a new line.
+        'none' = LF has to be explicitly written to advance lines."""
+        if (method == 'hard'):
+            self.NL = ( self.CR)
+            #TODO self.autofeed to LOW
+        elif (method == 'soft'):
+            self.NL = ( self.CR, self.LF)
+            #TODO self.autofeed to HIGH
+        elif (method == 'none'):
+            self.NL = ( self.CR)
+            #TODO self.autofeed to HIGH
+        else:
+            print("Error: "+method+" is not a valid method.")
+
+    def reverse_paper_feed(self, n):
+        """Reverse feed paper (negative y direction) by n/216 inches.
+    n : int
+        0 <= n <= 255"""
+        self.putchar( self.ESC, ord('j'), n)
+
+    def set_immediate_print_mode(self):
+        """Sets character by character printing."""
+        self.putchar( self.ESC, ord('i'), 1)
+
+    def unset_immediate_print_mode(self):
+        """Sets line by line printing."""
+        self.putchar( self.ESC, ord('i'), 0)
+
+    def set_double_height(self):
+        """Turns on double-height printing."""
+        self.putchar( self.ESC, ord('w'), 1)
+
+    def unset_double_height(self):
+        """Turns off double-height printing."""
+        self.putchar( self.ESC, ord('w'), 0)
+
+    def set_line_spacing(self, n):
+        """Set line spacing to n/216 inches.
+    n : int
+        0 <= n <= 255"""
+        self.putchar( self.ESC, ord('3'), n)
+
+    def unset_line_spacing(self):
+        """Set line spacing to default (1/6 inch)."""
+        self.putchar( self.ESC, ord('2'))
 
     def set_bold(self):
         """Select bold font."""
@@ -162,8 +243,7 @@ class ParallelAdapter:
             cols = image.width
             rows = image.height/8 + 1
             if (rows > 1):
-                #Adjust line spacing
-                self.putchar( self.ESC, ord('3'), 24)
+                self.set_line_spacing( 24)  # This spacing matches the height of the print head.
             for row in range(0, rows):
                 self.putchar( self.ESC, ord('*'), 5, cols%256, cols/256)
                 for col in range(0, cols):
@@ -177,6 +257,5 @@ class ParallelAdapter:
                     self.putchar( val)
                 self.putchar( self.CR, self.LF)
             if (rows > 1):
-                #Reset line spacing to default
-                self.putchar( self.ESC, ord('2'))
+                self.unset_line_spacing()
     
