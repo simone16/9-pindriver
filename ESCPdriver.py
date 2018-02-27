@@ -320,8 +320,12 @@ class ParallelAdapter:
                         xy = ( col, row*8 + i)
                         if ( xy[1] < image.height):
                             pixel = image.getpixel( xy)
-                            if ( pixel[0] == 0):
-                                val += 2**(7-i)
+                            try:
+                                if ( pixel[0] == 0):
+                                    val += 2**(7-i)
+                            except TypeError:
+                                if ( pixel == 0):
+                                    val += 2**(7-i)
                     self.putchar( val)
                 self.putchar( *(self.NL))
             if (rows > 1):
