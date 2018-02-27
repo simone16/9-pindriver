@@ -53,11 +53,11 @@ class ParallelAdapter:
 
     def __init__(self):
         # Define timings:
-        self.i2c_delay = 0.001          # Delay between i2c comunication and valid data on device [S].
-        self.strobe_duration = 0.01     # Width of the strobe active pulse.
-        self.busy_polling_delay = 0.01  # Delay between polls of busy.
+        self.i2c_delay = 0.0001          # Delay between i2c comunication and valid data on device [S].
+        self.strobe_duration = 0.001     # Width of the strobe active pulse.
+        self.busy_polling_delay = 0.001  # Delay between polls of busy.
         # Define character sequences:
-        NL = ( self.CR)                 # New Line (default is hardware autofeed enabled)
+        self.NL = ( self.CR,)           # New Line (default is hardware autofeed enabled)
         # Init i2c:
         self.i2c_address = 56           # Address of GPIO expander (all address pins grounded).
         self.i2c_bus = smbus.SMBus(1)   # i2c bus connected to GPIO expander.
@@ -100,6 +100,7 @@ class ParallelAdapter:
             sleep( self.strobe_duration)
             gpio.output( self.strobe, gpio.HIGH)
             # Wait for the printer to be ready again.
+            sleep( self.busy_polling_delay)
             while ( gpio.input( self.busy) == gpio.HIGH):
                 sleep( self.busy_polling_delay)
 
@@ -176,13 +177,13 @@ class ParallelAdapter:
                 If '\\n' is expanded to CR only, the printer won't feed a new line.
         'none' = LF has to be explicitly written to advance lines."""
         if (method == 'hard'):
-            self.NL = ( self.CR)
+            self.NL = ( self.CR,)
             #TODO self.autofeed to LOW
         elif (method == 'soft'):
             self.NL = ( self.CR, self.LF)
             #TODO self.autofeed to HIGH
         elif (method == 'none'):
-            self.NL = ( self.CR)
+            self.NL = ( self.CR,)
             #TODO self.autofeed to HIGH
         else:
             print("Error: "+method+" is not a valid method.")
@@ -255,7 +256,7 @@ class ParallelAdapter:
                             if ( pixel[0] == 0):
                                 val += 2**(7-i)
                     self.putchar( val)
-                self.putchar( self.CR, self.LF)
+                self.putchar( *(self.NL))
             if (rows > 1):
                 self.unset_line_spacing()
     
