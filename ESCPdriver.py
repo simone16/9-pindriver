@@ -220,6 +220,41 @@ class ParallelAdapter:
         """Set line spacing to default (1/6 inch)."""
         self.putchar( self.ESC, ord('2'))
 
+    def set_typeface_roman(self):
+        """Set typeface font for LQ printing to Roman (default)."""
+        self.putchar( self.ESC, ord('k'), 0)
+
+    def set_typeface_sansserif(self):
+        """Set typeface font for LQ printing to Sans serif."""
+        self.putchar( self.ESC, ord('k'), 1)
+
+    def set_pitch_10cpi(self):
+        """Set pitch to 10-cpi (default)."""
+        self.putchar( self.ESC, ord('P'))
+
+    def set_pitch_12cpi(self):
+        """Set pitch to 12-cpi."""
+        self.putchar( self.ESC, ord('M'))
+
+    def set_pitch_15cpi(self):
+        """Set pitch to 15-cpi."""
+        self.putchar( self.ESC, ord('g'))
+
+    def set_pitch_proportional(self):
+        """Set pitch to proportional spacing."""
+        self.putchar( self.ESC, ord('p'), 1)
+
+    def unset_pitch_proportional(self):
+        """Set pitch to last fixed value set."""
+        self.putchar( self.ESC, ord('p'), 0)
+
+    def set_interchar_space(self, n):
+        """Increases the space between characters by n/120 inches.
+        (default n = 0)
+        n : int
+            0 <= n <= 127"""
+        self.putchar( self.ESC, 32, n)
+
     def set_bold(self):
         """Select bold font."""
         self.putchar( self.ESC, ord('E'))
@@ -235,6 +270,38 @@ class ParallelAdapter:
     def unset_italics(self):
         """Cancel italics font."""
         self.putchar( self.ESC, ord('5'))
+
+    def set_double_strike(self):
+        """Each dot is printed twice with an offset to make characters bold."""
+        self.putchar( self.ESC, ord('G'))
+
+    def unset_double_strike(self):
+        """Cancel double strike printing."""
+        self.putchar( self.ESC, ord('H'))
+
+    def set_underline(self):
+        """Print a line below characters."""
+        self.putchar( self.ESC, ord('-'), 1)
+
+    def unset_underline(self):
+        """Cancel underline."""
+        self.putchar( self.ESC, ord('-'), 0)
+
+    def set_superscript(self):
+        """Set superscript layout."""
+        self.putchar( self.ESC, ord('S'), 0)
+
+    def set_subscript(self):
+        """Set subscript layout."""
+        self.putchar( self.ESC, ord('S'), 1)
+
+    def unset_script(self):
+        """Cancel super or subscript commands."""
+        self.putchar( self.ESC, ord('T'))
+
+    def beep(self):
+        """Beeps the printer for 1/10 of a second."""
+        self.putchar( self.BEL)
 
     def write_image(self, filename):
         """Writes pixel values from an image file.
