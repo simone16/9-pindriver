@@ -220,12 +220,38 @@ class ParallelAdapter:
         """Set line spacing to default (1/6 inch)."""
         self.putchar( self.ESC, ord('2'))
 
+    def assign_char_table(self, d1, d2, d3):
+        """Assign char table specified by d2 and d3 to d1.
+    d1 : int
+        d1 = 0 Default char table (italics)
+        d1 = 1 Symbol char table
+    d2, d3 : int
+        0 <= d2, d3 <= 255
+        See ESC/P specification for available tables."""
+        self.putchar( self.ESC, ord('('), ord('t'), 3, 0, d1, d2, d3)
+
+    def set_symbol_char_table(self):
+        """Select the symbol char table."""
+        self.putchar( self.ESC, ord('t'), 1)
+
+    def unset_symbol_char_table(self):
+        """Select the default char table (italics)."""
+        self.putchar( self.ESC, ord('t'), 0)
+
+    def set_NLQ(self):
+        """Select Near Letter Quality printing."""
+        self.putchar( self.ESC , ord('x'), 1)
+
+    def unset_NLQ(self):
+        """Select draft quality printing."""
+        self.putchar( self.ESC , ord('x'), 0)
+
     def set_typeface_roman(self):
-        """Set typeface font for LQ printing to Roman (default)."""
+        """Set typeface font for NLQ printing to Roman (default)."""
         self.putchar( self.ESC, ord('k'), 0)
 
     def set_typeface_sansserif(self):
-        """Set typeface font for LQ printing to Sans serif."""
+        """Set typeface font for NLQ printing to Sans serif."""
         self.putchar( self.ESC, ord('k'), 1)
 
     def set_pitch_10cpi(self):
