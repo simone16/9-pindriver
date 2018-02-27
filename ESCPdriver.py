@@ -59,8 +59,9 @@ class ParallelAdapter:
         self.i2c_address = 56           # Address of GPIO expander (all address pins grounded).
         self.i2c_bus = smbus.SMBus(1)   # i2c bus connected to GPIO expander.
         # Set all ports in expander to high impedance.
-        if not(self.i2c_bus.write_byte( self.i2c_address, 0b11111111) == 0):
-            print("Error: Could not write to i2c device.")
+        err = self.i2c_bus.write_byte( self.i2c_address, 0b11111111)
+        if not(err == None):
+            print("Error " +str(err)+ " : Could not write to i2c device.")
         # Init GPIO:
         self.strobe = 4
         self.busy = 17
@@ -70,8 +71,9 @@ class ParallelAdapter:
 
     def __del__(self):
         # reset i2c device to safe state:
-        if not(self.i2c_bus.write_byte( self.i2c_address, 0b11111111) == 0):
-            print("Error: Could not write to i2c device.")
+        err = self.i2c_bus.write_byte( self.i2c_address, 0b11111111)
+        if not(err == None):
+            print("Error " +str(err)+ " : Could not write to i2c device.")
         # release i2c bus
         self.i2c_bus.close()
         # clean gpio
@@ -85,14 +87,15 @@ class ParallelAdapter:
         8-bit values to transmit."""
         for val in values:
             # Set parallel data bus to value:
-            if not (self.i2c_bus.write_byte( self.i2c_address, val) == 0):
-                print("Error: Could not write to i2c device.")
+            err = self.i2c_bus.write_byte( self.i2c_address, val)
+            if not(err == None):
+                print("Error " +str(err)+ " : Could not write to i2c device.")
                 return
             sleep( self.i2c_delay )     # Wait for valid data at gpio expander.
             # Send strobe pulse.
-            gpio.output( self.probe, gpio.LOW)
+            gpio.output( self.strobe, gpio.LOW)
             sleep( self.strobe_duration)
-            gpio.output( self.probe, gpio.HIGH)
+            gpio.output( self.strobe, gpio.HIGH)
             # Wait for the printer to be ready again.
             while ( gpio.input( self.busy) == gpio.HIGH):
                 sleep( self.busy_polling_delay)
@@ -100,26 +103,40 @@ class ParallelAdapter:
     def write_string(self, message):
         """Writes a string message on parallel bus.
     The message will not be printed immediately unless it is
-    terminated by a CR.
+    terminated by a newline.
     message : string"""
-       message = list(message)
+        message = list(message)
         for char in message:
             char = ord(char)
             self.putchar(char)
 
     def writeln(self, message):
-        """Writes a string message, CR signal is appended automatically.
+        """Writes a string message, newline signal is appended automatically.
     message : string"""
         self.write_string(message)
-        self.putchar( self.CR)
+        self.putchar( self.CR, self.LF)
 
     def write_file(self, filename):
         """Writes characters from a file.
     filename : string
         Path to file."""
-        with open( file, "r") as source:
+        with open( filename, "r") as source:
             for line in source:
-                self.print(line)
+                self.write_string(line)
+
+    def set_right_margin(self, n):
+        """Set the right margin to n number of columns
+    in the current character pitch.
+    n : int
+        1 <= n <= 255"""
+        self.putchar( self.ESC, ord('Q'), n)
+
+    def set_left_margin(self, n):
+        """Set the left margin to n number of columns
+    in the current character pitch.
+    n : int
+        1 <= n <= 255"""
+        self.putchar( self.ESC, ord('l'), n)
 
     def set_bold(self):
         """Select bold font."""
@@ -127,7 +144,7 @@ class ParallelAdapter:
 
     def unset_bold(self):
         """Cancel bold font."""
-        self.puchar( self.ESC, ord('F'))
+        self.putchar( self.ESC, ord('F'))
 
     def set_italics(self):
         """Select italics font."""
@@ -137,33 +154,29 @@ class ParallelAdapter:
         """Cancel italics font."""
         self.putchar( self.ESC, ord('5'))
 
-    def write_image(self, filename, m=5):
+    def write_image(self, filename):
         """Writes pixel values from an image file.
     filename : string
-        Path to image file
-    m : int
-        printing mode as defined in ESC/P standard."""
-        bytes_per_column = 1
-        if (m > 7):
-            bytes_per_column = 3
-        if (m > 40):
-            bytes_per_column = 6
+        Path to image file"""
         with Image.open( filename) as image:
             cols = image.width
-            rows = image.height/(8*bytes_per_column) + 1
+            rows = image.height/8 + 1
             if (rows > 1):
                 #Adjust line spacing
                 self.putchar( self.ESC, ord('3'), 24)
-            self.putchar( self.ESC, ord('*'), m, cols%256, cols/256)
             for row in range(0, rows):
+                self.putchar( self.ESC, ord('*'), 5, cols%256, cols/256)
                 for col in range(0, cols):
-                    for i in range(0, bytes_per_column):
-                        val = 0
-                        for j in range(0, 8):
-                            pixel = image.getpixel( ( row, col*8*bytes_per_column + 8*i + j))
+                    val = 0
+                    for i in range(0, 8):
+                        xy = ( col, row*8 + i)
+                        if ( xy[1] < image.height):
+                            pixel = image.getpixel( xy)
                             if ( pixel[0] == 0):
-                                val += 2**j
-                        self.putchar( val)
+                                val += 2**(7-i)
+                    self.putchar( val)
+                self.putchar( self.CR, self.LF)
             if (rows > 1):
                 #Reset line spacing to default
                 self.putchar( self.ESC, ord('2'))
+    
