@@ -1,0 +1,13 @@
+# Introduction #
+
+Automake is a tool for automatically generating Makefile.ins from files called Makefile.am. Each Makefile.am is basically a series of make variable definitions1, with rules being thrown in occasionally. The generated Makefile.ins are compliant with the GNU Makefile standards.
+
+The GNU Makefile Standards Document (see Makefile Conventions in The GNU Coding Standards) is long, complicated, and subject to change. The goal of Automake is to remove the burden of Makefile maintenance from the back of the individual GNU maintainer (and put it on the back of the Automake maintainers).
+
+The typical Automake input file is simply a series of variable definitions. Each such file is processed to create a Makefile.in.
+
+Automake does constrain a project in certain ways; for instance, it assumes that the project uses Autoconf (see Introduction in The Autoconf Manual), and enforces certain restrictions on the configure.ac contents.
+
+Automake requires perl in order to generate the Makefile.ins. However, the distributions created by Automake are fully GNU standards-compliant, and do not require perl in order to be built.
+
+For more information on bug reports, See Reporting Bugs. 

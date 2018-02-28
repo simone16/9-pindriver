@@ -1,0 +1,37 @@
+Headers:
+	# Level 1	bold & double height & high pitch
+	## Level 2	double height & high pitch
+	### Level 3	bold & high pitch
+   #### Level 4 high pitch
+
+Horizontal rule:
+	---- -> hor rule.
+
+Emphasis:
+	*x* or _x_ italics
+	**x** or __x__ bold
+
+Lists:
+	+ or - -> symbol #7 & indentation
+	1. -> <listnumber>. & indentation
+
+Images:
+	![alt text](path/to/img.jpg)
+
+Verbatim:
+	`x` -> do not interpret symbols
+
+Escape characters:
+	The following characters needs to be escaped with \ to be printed:
+		\   backslash
+		`   backtick
+		*   asterisk
+		_   underscore
+		{}  curly braces
+		[]  square brackets
+		()  parentheses
+		#   hash mark
+		+   plus sign
+		-   minus sign (hyphen)
+		.   dot
+		!   exclamation mark	

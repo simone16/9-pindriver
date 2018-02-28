@@ -329,6 +329,11 @@ class ParallelAdapter:
         """Beeps the printer for 1/10 of a second."""
         self.putchar( self.BEL)
 
+    def reset_printer(self):
+        """Reset printer settings to default.
+    Not all settings are affected."""
+        self.putchar( self.ESC, ord('@'))
+
     def write_image(self, filename):
         """Writes pixel values from an image file.
     filename : string
@@ -345,7 +350,11 @@ class ParallelAdapter:
                     for i in range(0, 8):
                         xy = ( col, row*8 + i)
                         if ( xy[1] < image.height):
-                            pixel = image.getpixel( xy)
+                            pixel = 0
+                            try:
+                                pixel = image.getpixel( xy)
+                            except:
+                                pass
                             try:
                                 if ( pixel[0] == 0):
                                     val += 2**(7-i)
