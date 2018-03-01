@@ -6,6 +6,7 @@ Headers:
 
 Horizontal rule:
 	---- -> hor rule.
+	==== -> double hor rule
 
 Emphasis:
 	*x* or _x_ italics

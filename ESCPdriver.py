@@ -2,20 +2,25 @@
 # 9-pin head impact mactrix printers via an emulated parallel port.
 # It has been tested against a MT81 Tally printer using a raspberrypi
 # host.
-# Parallel port emulation hardware was provided by the broadcomm gpio
-# module and an external 8-bit gpio expander (PCF8574A) connected via
-# the smbus I2c module.
+# Parallel port emulation hardware was provided by an external 16-bit 
+# gpio expander (MCP23017) connected via the smbus I2c module.
+# The parallel SelectIn pin (number 17 on the DB25 connector) is hardware
+# grounded.
+# Older versions used the PCF8574 (8-bit expander) plus some GPIO pins
+# from the raspberry broadcomm module.
+# If you want to use different hardware, see the putchar() function,
+# __init__(), set_autofeed_method() and status() will require modifiction too.
 #
 # Author: Simone Pilon <wertyseek@gmail.com>
 # Creation: 25-02-2018
 
-import smbus            # I2c
-import RPi.GPIO as gpio # GPIO
+from smbus import SMBus # I2c
 from time import sleep  # Timing
 from PIL import Image   # Read images
 
 class ParallelAdapter:
-    """Driver to communicate with the printer."""
+    """A driver to communicate with 9-pin dot matrix printers.
+    The 9-pin ESC/P standard is implemented."""
     # Define special ASCII characters.
     NUL = 0     #Null char
     SOH = 1     #Start of Heading
@@ -50,38 +55,31 @@ class ParallelAdapter:
     RS = 30     #Record Separator
     US  = 31    #Unit Separator
 
+    # Define GPIO pins ( PORTA is directly connected to parallel data bus D0-D7)
+    # so only the B index is required.
+    _STROBE = 0     #OUT, Active LOW
+    _ACK = 1        #IN,  Active HIGH
+    _BUSY = 2       #IN,  Active HIGH
+    _PAPEREND = 3   #IN,  Active HIGH
+    _SELECT = 4     #IN,  Active HIGH
+    _AUTOFEED = 5   #OUT, Active LOW
+    _ERROR = 6      #IN,  Active LOW
+    _INIT = 7       #OUT, Active LOW
+    #_SELECTIN = None #OUT, Active LOW
 
     def __init__(self):
         # Define timings:
-        self.i2c_delay = 0.0001          # Delay between i2c comunication and valid data on device [S].
+        self.i2c_delay = 0.001         # Delay between i2c comunication and valid data on device (max. 3.45uS by datasheet) [S].
         self.strobe_duration = 0.001     # Width of the strobe active pulse.
         self.busy_polling_delay = 0.001  # Delay between polls of busy.
         # Define character sequences:
-        self.NL = ( self.CR,)           # New Line (default is hardware autofeed enabled)
-        # Init i2c:
-        self.i2c_address = 56           # Address of GPIO expander (all address pins grounded).
-        self.i2c_bus = smbus.SMBus(1)   # i2c bus connected to GPIO expander.
-        # Set all ports in expander to high impedance.
-        err = self.i2c_bus.write_byte( self.i2c_address, 0b11111111)
-        if not(err == None):
-            print("Error " +str(err)+ " : Could not write to i2c device.")
-        # Init GPIO:
-        self.strobe = 4
-        self.busy = 17
-        gpio.setmode( gpio.BCM)
-        gpio.setup( channel=self.strobe, direction=gpio.OUT, initial=gpio.HIGH)
-        gpio.setup( channel=self.busy, direction=gpio.IN, pull_up_down=gpio.PUD_UP)
-
-    def __del__(self):
-        # reset i2c device to safe state:
-        err = self.i2c_bus.write_byte( self.i2c_address, 0b11111111)
-        if not(err == None):
-            print("Error " +str(err)+ " : Could not write to i2c device.")
-        # release i2c bus
-        self.i2c_bus.close()
-        # clean gpio
-        gpio.cleanup()
-        print("Released all resources.")
+        self.NL = ( self.CR,)            # New Line (default is hardware autofeed enabled)
+        self._hard_autofeed = True       # hardware autofeed enabled
+        # Init external circuit:
+        self.gpio = MCP23017()
+        self.gpio.write( self.gpio.IODIRA, 0)   # PORTA all output
+        io = 2**self._ACK + 2**self._BUSY + 2**self._PAPEREND + 2**self._SELECT + 2**self._ERROR
+        self.gpio.write( self.gpio.IODIRB, io)  # Set the input pins
 
     def putchar(self, *values):
         """Sends the values via the parallel bus.
@@ -90,19 +88,44 @@ class ParallelAdapter:
         8-bit values to transmit."""
         for val in values:
             # Set parallel data bus to value:
-            err = self.i2c_bus.write_byte( self.i2c_address, val)
-            if not(err == None):
-                print("Error " +str(err)+ " : Could not write to i2c device.")
-                return
+            self.gpio.write( self.gpio.GPIOA, val)
             sleep( self.i2c_delay )     # Wait for valid data at gpio expander.
             # Send strobe pulse.
-            gpio.output( self.strobe, gpio.LOW)
+            valB = 0b11111111
+            if ( self._hard_autofeed):
+                valB ^= (0b1 << self._AUTOFEED)
+            self.gpio.write( self.gpio.GPIOB, valB)
             sleep( self.strobe_duration)
-            gpio.output( self.strobe, gpio.HIGH)
+            valB ^= (0b1 << self._STROBE)
+            self.gpio.write( self.gpio.GPIOB, valB)
             # Wait for the printer to be ready again.
-            sleep( self.busy_polling_delay)
-            while ( gpio.input( self.busy) == gpio.HIGH):
+            ready = False
+            while (not ready):
                 sleep( self.busy_polling_delay)
+                stt = self.status()
+                if ( (stt['PAPEREND'] == 1) or (stt['SELECT'] == 0) or (stt['ERROR'] == 0)):
+                    print("Error encountered by the printer.\nPrinter status:")
+                    if (stt['PAPEREND'] == 1):
+                        print("Out of paper.")
+                    if (stt['SELECT'] == 0):
+                        print("Printer not selected.")
+                    if (stt['ERROR'] == 0):
+                        print("Printer error (maybe not online?).")
+                    return
+                if ( (stt['BUSY'] == 0) and (stt['ACK'] == 1)):
+                    ready = True
+
+    def status(self):
+        """Returns the status of the printer by reading the
+    ACK, BUSY, PAPEREND, SELECT and ERROR pins."""
+        valB = self.gpio.read( self.gpio.GPIOB)
+        stt = {}
+        stt['ACK'] = (valB >> self._ACK)%2
+        stt['BUSY'] = (valB >> self._BUSY)%2
+        stt['PAPEREND'] = (valB >> self._PAPEREND)%2
+        stt['SELECT'] = (valB >> self._SELECT)%2
+        stt['ERROR'] = (valB >> self._ERROR)%2
+        return stt
 
     def write_string(self, message):
         """Writes a string message on parallel bus.
@@ -173,18 +196,20 @@ class ParallelAdapter:
         'hard' = Grounds AUTOF pin, the printer will
                 perform a LF at every CR.
                 If '\\n' is expanded to CR+LF, line spacing will be double.
-        'soft' = The adapter appends LF to CR when calling new_line().
+                N.B. If the program exits before printing is complete,
+                the AUTOF pin will float and the printer will misbehave.
+        'soft' = The adapter appends LF to CR when calling writeln() and write_image().
                 If '\\n' is expanded to CR only, the printer won't feed a new line.
         'none' = LF has to be explicitly written to advance lines."""
         if (method == 'hard'):
             self.NL = ( self.CR,)
-            #TODO self.autofeed to LOW
+            self._hard_autofeed = True
         elif (method == 'soft'):
             self.NL = ( self.CR, self.LF)
-            #TODO self.autofeed to HIGH
+            self._hard_autofeed = False
         elif (method == 'none'):
             self.NL = ( self.CR,)
-            #TODO self.autofeed to HIGH
+            self._hard_autofeed = False
         else:
             print("Error: "+method+" is not a valid method.")
 
@@ -237,6 +262,17 @@ class ParallelAdapter:
     def unset_symbol_char_table(self):
         """Select the default char table (italics)."""
         self.putchar( self.ESC, ord('t'), 0)
+
+    def set_print_control_codes(self):
+        """Treat codes 0-6, 16, 17, 21-23, 25, 26, 28-31, and 128-159 as
+    printable characters (by default they are commands).
+    N.B. the default char table does not define gliphs for these codes
+    and the command is ignored."""
+        self.putchar( self.ESC, ord('I'), 1)
+
+    def unset_print_control_codes(self):
+        """Treat control codes as codes (default)."""
+        self.putchar( self.ESC, ord('I'), 0)
 
     def set_NLQ(self):
         """Select Near Letter Quality printing."""
@@ -334,6 +370,16 @@ class ParallelAdapter:
     Not all settings are affected."""
         self.putchar( self.ESC, ord('@'))
 
+    def reset_hard(self):
+        """Reset printer settings to default.
+    Uses the RESET pin on the parallel port."""
+        valB = 0b11111111
+        if ( self._hard_autofeed):
+                valB ^= (0b1 << self._AUTOFEED)
+        self.gpio.write( self.gpio.GPIOB, valB ^ (0b1 << self._INIT))
+        sleep(self.strobe_duration)
+        self.gpio.write( self.gpio.GPIOB, valB)
+
     def write_image(self, filename):
         """Writes pixel values from an image file.
     filename : string
@@ -366,3 +412,156 @@ class ParallelAdapter:
             if (rows > 1):
                 self.unset_line_spacing()
     
+class MCP23017:
+    """Provide helpful values and functions to communicate
+    with the external MCP23017 device."""
+
+    # register addresses:
+    
+    @property
+    def IODIRA(self):
+        return self._IODIRA[self._BANK]
+    
+    @property
+    def IODIRB(self):
+        return self._IODIRB[self._BANK]
+
+    @property
+    def IPOLA(self):
+        return self._IPOLA[self._BANK]
+
+    @property
+    def IPOLB(self):
+        return self._IPOLB[self._BANK]
+
+    @property
+    def GPINTENA(self):
+        return self._GPINTENA[self._BANK]
+
+    @property
+    def GPINTENB(self):
+        return self._GPINTENB[self._BANK]
+
+    @property
+    def DEFVALA(self):
+        return self._DEFVALA[self._BANK]
+
+    @property
+    def DEFVALB(self):
+        return self._DEFVALB[self._BANK]
+
+    @property
+    def INTCONA(self):
+        return self._INTCONA[self._BANK]
+
+    @property
+    def DEFVALB(self):
+        return self._DEFVALB[self._BANK]
+
+    @property
+    def INTCONA(self):
+        return self._INTCONA[self._BANK]
+
+    @property
+    def INTCONB(self):
+        return self._INTCONB[self._BANK]
+
+    @property
+    def IOCON(self):
+        return self._IOCON[self._BANK]
+
+    @property
+    def GPPUA(self):
+        return self._GPPUA[self._BANK]
+
+    @property
+    def GPPUB(self):
+        return self._GPPUB[self._BANK]
+
+    @property
+    def INTFA(self):
+        return self._INTFA[self._BANK]
+
+    @property
+    def INTFB(self):
+        return self._INTFB[self._BANK]
+
+    @property
+    def INTCAPA(self):
+        return self._INTCAPA[self._BANK]
+
+    @property
+    def INTCAPB(self):
+        return self._INTCAPB[self._BANK]
+
+    @property
+    def GPIOA(self):
+        return self._GPIOA[self._BANK]
+
+    @property
+    def GPIOB(self):
+        return self._GPIOB[self._BANK]
+
+    @property
+    def OLATA(self):
+        return self._OLATA[self._BANK]
+
+    @property
+    def OLATB(self):
+        return self._OLATB[self._BANK]
+
+    # Internal registers addresses for IOCON.BANK = 0 and IOCON.BANK = 1
+    _IODIRA = (0, 0)
+    _IODIRB = (1, 16)
+    _IPOLA = (2, 1)
+    _IPOLB = (3, 17)
+    _GPINTENA = (4, 2)
+    _GPINTENB = (5, 18)
+    _DEFVALA = (6, 3)
+    _DEFVALB = (7, 19)
+    _INTCONA = (8, 4)
+    _INTCONB = (9, 20)
+    _IOCON = (10, 5)
+    _GPPUA = (12, 6)
+    _GPPUB = (13, 22)
+    _INTFA = (14, 7)
+    _INTFB = (15, 23)
+    _INTCAPA = (16, 8)
+    _INTCAPB = (17,24)
+    _GPIOA = (18, 9)
+    _GPIOB = (19, 25)
+    _OLATA = (20, 10)
+    _OLATB = (21, 26)
+
+    def __init__(self, address = 32):
+        """The device is assumed to be in the POR/Reset state."""
+        self.address = address
+        self._BANK = 0
+        self.i2c_bus = SMBus(1)
+
+    def __del__(self):
+        """The device is left in a safe state (all ports are high impedance)."""
+        self.write( self.IODIRB, 0b11111111)
+        self.write( self.IODIRA, 0b11111111)
+        self.i2c_bus.close()
+        print("Closed i2c bus.")
+        
+    def write(self, register, value):
+        """Writes value to device register.
+    register : int
+        8 bit internal address of the device register.
+        All addresses are defined by this class.
+    value : int
+        8 bit value to assign to register."""
+        err = self.i2c_bus.write_byte_data( self.address, register, value)
+        if not (err == None):
+            print("SMBus error "+str(err)+".")
+
+    def read(self, register):
+        """Read  value from device register.
+    register : int
+        8 bit internal address of the device register.
+        All addresses are defined by this class.
+    return : int
+        8 bit value read from register."""
+        return self.i2c_bus.read_byte_data( self.address, register)
