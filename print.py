@@ -60,24 +60,20 @@ def readline( line):
                 level += 1
             if (level == 1):
                 pa.set_double_height()
-                pa.set_bold()
-                pa.set_interchar_space(20)
+                pa.set_double_width()
                 pa.set_line_spacing(60)
                 pa.write_string( "".join(line[i+level:]))
                 pa.unset_double_height()
-                pa.unset_bold()
-                pa.set_interchar_space(0)
+                pa.unset_double_width()
                 pa.unset_line_spacing()
             elif (level == 2):
                 pa.set_double_height()
-                pa.set_interchar_space(20)
                 pa.set_line_spacing(60)
                 pa.write_string( "".join(line[i+level:]))
                 pa.unset_double_height()
-                pa.set_interchar_space(0)
                 pa.unset_line_spacing()
             elif (level == 3):
-                pa.set_interchar_space(20)
+                pa.set_interchar_space(100)
                 pa.set_bold()
                 pa.write_string( "".join(line[i+level:]))
                 pa.unset_bold()
