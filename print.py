@@ -22,6 +22,7 @@ pa = ESCPdriver.ParallelAdapter()
 pa.reset_printer()
 pa.set_right_margin(65)
 pa.set_symbol_char_table()
+pa.set_autofeed_method( "soft")
 
 # Line parsing block:
 def readline( line):
@@ -59,30 +60,30 @@ def readline( line):
                 level += 1
             if (level == 1):
                 pa.set_double_height()
-                pa.set_double_strike()
-                pa.set_interchar_space(10)
+                pa.set_bold()
+                pa.set_interchar_space(20)
                 pa.set_line_spacing(60)
                 pa.write_string( "".join(line[i+level:]))
                 pa.unset_double_height()
-                pa.unset_double_strike()
+                pa.unset_bold()
                 pa.set_interchar_space(0)
                 pa.unset_line_spacing()
             elif (level == 2):
                 pa.set_double_height()
-                pa.set_interchar_space(10)
+                pa.set_interchar_space(20)
                 pa.set_line_spacing(60)
                 pa.write_string( "".join(line[i+level:]))
                 pa.unset_double_height()
                 pa.set_interchar_space(0)
                 pa.unset_line_spacing()
             elif (level == 3):
-                pa.set_interchar_space(10)
-                pa.set_double_strike()
+                pa.set_interchar_space(20)
+                pa.set_bold()
                 pa.write_string( "".join(line[i+level:]))
-                pa.unset_double_strike()
+                pa.unset_bold()
                 pa.set_interchar_space(0)
             else:
-                pa.set_interchar_space(10)
+                pa.set_interchar_space(20)
                 pa.write_string( "".join(line[i+level:]))
                 pa.set_interchar_space(0)
             i += level - 1
@@ -93,17 +94,22 @@ def readline( line):
             pa.putchar(*([196]*65))
             olist_index = 0
             return
+        elif ( line[i] == '=' and line[i+1] == '='
+                and line[i+2] == '=' and line[i+3] == '='):
+            pa.putchar(*([205]*65))
+            olist_index = 0
+            return
         elif ( line[i] == '+' or line[i] == '-'):
-            pa.putchar(7)
+            pa.putchar(249)
             olist_index = 0
         elif ( line[i] == '*'):
             if ( line[i+1] == '*'):
                 if ( strong):
                     strong = False
-                    pa.unset_double_strike()
+                    pa.unset_bold()
                 else:
                     strong = True
-                    pa.set_double_strike()
+                    pa.set_bold()
                 i += 1
             else:
                 if (emphasis):
@@ -116,10 +122,10 @@ def readline( line):
             if ( line[i+1] == '_'):
                 if ( strong):
                     strong = False
-                    pa.unset_double_strike()
+                    pa.unset_bold()
                 else:
                     strong = True
-                    pa.set_double_strike()
+                    pa.set_bold()
                 i += 1
             else:
                 if (emphasis):
@@ -141,6 +147,8 @@ def readline( line):
                 j += 1
             path = line[i+1:j]
             i = j+1
+            if not(i == 0):
+                pa.write_string("\n")
             try:
                 pa.write_image("".join(path))
             except:
