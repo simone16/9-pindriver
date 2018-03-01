@@ -128,20 +128,6 @@ class ParallelAdapter:
             for line in source:
                 self.write_string(line)
 
-    def set_right_margin(self, n):
-        """Set the right margin to n number of columns
-    in the current character pitch.
-    n : int
-        1 <= n <= 255"""
-        self.putchar( self.ESC, ord('Q'), n)
-
-    def set_left_margin(self, n):
-        """Set the left margin to n number of columns
-    in the current character pitch.
-    n : int
-        1 <= n <= 255"""
-        self.putchar( self.ESC, ord('l'), n)
-
     def set_page_length_lines(self, n):
         """Set the page length to n lines in the current
     line spacing.
@@ -167,6 +153,20 @@ class ParallelAdapter:
     (Cancel skip-over-perforation)."""
         self.putchar( self.ESC, ord('O'))
 
+    def set_right_margin(self, n):
+        """Set the right margin to n number of columns
+    in the current character pitch.
+    n : int
+        1 <= n <= 255"""
+        self.putchar( self.ESC, ord('Q'), n)
+
+    def set_left_margin(self, n):
+        """Set the left margin to n number of columns
+    in the current character pitch.
+    n : int
+        1 <= n <= 255"""
+        self.putchar( self.ESC, ord('l'), n)
+
     def set_autofeed_method(self, method):
         """Set autofeed.
     method : string
@@ -187,6 +187,108 @@ class ParallelAdapter:
             #TODO self.autofeed to HIGH
         else:
             print("Error: "+method+" is not a valid method.")
+
+    def set_abs_hor_pos(self, n):
+        """Set absolute horizontal print position to n in 1/60inch units
+    from the left margin.
+    n : int
+        0 <= n <= 32767"""
+        self.putchar( self.ESC, ord('$'), n%256, n/256)
+
+    def set_rel_hor_pos(self, n):
+        """Set relative horizontal print position to n in 1/120inch units.
+    n : signed int
+        -16384 <= n <= 16384"""
+        nl = 0
+        nh = 0
+        if (n < 0):
+            nl = 32768 - ((-n)%256)
+            nh = 32768 - ((-n)/256)
+        else:
+            nl = n%256
+            nh = n/256
+        self.putchar( self.ESC, ord('\\'), nl, nh)
+
+    def paper_feed(self, n):
+        """Advance print position vertically by n/216 inches.
+    n : int
+        0 <= n <= 255"""
+        self.putchar( self.ESC, ord('J'), n)
+
+    def hor_skip(self, n):
+        """Prints n spaces.
+    n : int
+        0 <= n <= 127"""
+        self.putchar( self.ESC, ord('f'), 0, n)
+
+    def ver_skip(self, n):
+        """Perform n LFs and a CR.
+    n : int
+        0 <= n <= 127"""
+        self.putchar( self.ESC, ord('f'), 1, n)
+
+    def set_line_spacing(self, n):
+        """Set line spacing to n/216 inches.
+    n : int
+        0 <= n <= 255"""
+        self.putchar( self.ESC, ord('3'), n)
+
+    def set_one8_line_spacing(self):
+        """Set line spacing to 1/8 inch."""
+        self.putchar( self.ESC, ord('0'))
+
+    def unset_line_spacing(self):
+        """Set line spacing to default (1/6 inch)."""
+        self.putchar( self.ESC, ord('2'))
+
+    def set_hor_tabs(self, *n):
+        """Set the position of consecutive tabs at n characters from left margin.
+    n : int
+        1 <= n <= 255, up to 32 tabs."""
+        n.sort()
+        self.putchar( self.ESC, ord('D'), *n)
+        self.putchar( self.NUL)
+
+    def set_ver_tabs(self, *n):
+        """Set the position of consecutive vertical tabs at n lines from top of form.
+    n : int
+        1 <= n <= 255, up to 16 tabs."""
+        n.sort()
+        self.putchar( self.ESC, ord('B'), *n)
+        self.putchar( self.NUL)
+
+    def set_hor_tab_increment(self, n):
+        """Set tabs every n characters in the current pitch.
+    n : int
+        1 <= n <= 21, 25, 36 for 10cpi, 12cpi, condensed."""
+        self.putchar( self.ESC, ord('e'), 0, n)
+
+    def set_ver_tab_increment(self, n):
+        """Set vertical tabs every n lines.
+    n : int
+        1 <= n <= 127"""
+        self.putchar( self.ESC, ord('e'), 1, n)
+
+    def set_justification(self, justification):
+        """Set justification according to value.
+    justification : string
+        'left' = flush left
+        'right' = flush right
+        'center' = centered
+        'full' = full justification"""
+        n = 0
+        if ( justification == 'left'):
+            pass
+        elif ( justification == 'right'):
+            n = 2
+        elif ( justification == 'center'):
+            n = 1
+        elif ( justification == 'full'):
+            n = 3
+        else:
+            print('Error: '+justification+" invalid justification value.")
+            return
+        self.putchar( self.ESC, ord('a'), n)
 
     def reverse_paper_feed(self, n):
         """Reverse feed paper (negative y direction) by n/216 inches.
@@ -209,16 +311,6 @@ class ParallelAdapter:
     def unset_double_height(self):
         """Turns off double-height printing."""
         self.putchar( self.ESC, ord('w'), 0)
-
-    def set_line_spacing(self, n):
-        """Set line spacing to n/216 inches.
-    n : int
-        0 <= n <= 255"""
-        self.putchar( self.ESC, ord('3'), n)
-
-    def unset_line_spacing(self):
-        """Set line spacing to default (1/6 inch)."""
-        self.putchar( self.ESC, ord('2'))
 
     def assign_char_table(self, d1, d2, d3):
         """Assign char table specified by d2 and d3 to d1.

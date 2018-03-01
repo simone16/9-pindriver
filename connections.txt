@@ -14,3 +14,6 @@ DB25 pin 18 (GND) --> GND
 DB25 pin 17 (SelectIn) --> GND
 DB25 pin 1 (Strobe) --> raspy.GPIO_4
 DB25 pin 11 (Busy) --> raspy.GPIO_17
+
+
+max output valid from clock 3.45 uS (set delay to 100uS)
