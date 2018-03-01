@@ -245,6 +245,15 @@ class ParallelAdapter:
         """Set line spacing to default (1/6 inch)."""
         self.putchar( self.ESC, ord('2'))
 
+    def set_double_width(self):
+        """Select double width mode. All characters and
+    spaces are twice as wide."""
+        self.putchar( self.ESC, ord('W'), 1)
+
+    def set_double_width(self):
+        """Cancel double width printing."""
+        self.putchar( self.ESC, ord('W'), 0)
+
     def assign_char_table(self, d1, d2, d3):
         """Assign char table specified by d2 and d3 to d1.
     d1 : int
@@ -301,6 +310,14 @@ class ParallelAdapter:
     def set_pitch_15cpi(self):
         """Set pitch to 15-cpi."""
         self.putchar( self.ESC, ord('g'))
+
+    def set_condensed(self):
+        """Increases the pitch depending on the value set."""
+        self.putchar( self.SI)
+
+    def unset_condensed(self):
+        """Restores the normal pitch."""
+        self.putchar( self.DC2)
 
     def set_pitch_proportional(self):
         """Set pitch to proportional spacing."""
