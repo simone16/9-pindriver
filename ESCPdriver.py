@@ -487,6 +487,7 @@ class ParallelAdapter:
         self.gpio.write( self.gpio.GPIOB, valB ^ (0b1 << self._INIT))
         sleep(self.strobe_duration)
         self.gpio.write( self.gpio.GPIOB, valB)
+        self.putchar(ord(' '))  # Wait for the printer to be ready.
 
     def set_immediate_print_mode(self):
         """Sets character by character printing."""

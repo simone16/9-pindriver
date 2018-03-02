@@ -64,11 +64,11 @@ def readline( line):
             if (level == 1):
                 pa.set_pitch_10cpi()
                 pa.set_double_height()
-                pa.set_bold()
+                pa.set_double_width()
                 pa.set_line_spacing(60)
                 pa.write_string( "".join(line[i+level:]))
                 pa.unset_double_height()
-                pa.unset_bold()
+                pa.unset_double_width()
                 pa.unset_line_spacing()
                 pa.set_pitch_12cpi()
             elif (level == 2):
