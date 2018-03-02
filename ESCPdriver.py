@@ -87,33 +87,40 @@ class ParallelAdapter:
     values : int
         8-bit values to transmit."""
         for val in values:
-            # Set parallel data bus to value:
-            self.gpio.write( self.gpio.GPIOA, val)
-            sleep( self.i2c_delay )     # Wait for valid data at gpio expander.
-            # Send strobe pulse.
-            valB = 0b11111111
-            if ( self._hard_autofeed):
-                valB ^= (0b1 << self._AUTOFEED)
-            self.gpio.write( self.gpio.GPIOB, valB)
-            sleep( self.strobe_duration)
-            valB ^= (0b1 << self._STROBE)
-            self.gpio.write( self.gpio.GPIOB, valB)
-            # Wait for the printer to be ready again.
-            ready = False
-            while (not ready):
-                sleep( self.busy_polling_delay)
-                stt = self.status()
-                if ( (stt['PAPEREND'] == 1) or (stt['SELECT'] == 0) or (stt['ERROR'] == 0)):
-                    print("Error encountered by the printer.\nPrinter status:")
-                    if (stt['PAPEREND'] == 1):
-                        print("Out of paper.")
-                    if (stt['SELECT'] == 0):
-                        print("Printer not selected.")
-                    if (stt['ERROR'] == 0):
-                        print("Printer error (maybe not online?).")
-                    return
-                if ( (stt['BUSY'] == 0) and (stt['ACK'] == 1)):
-                    ready = True
+            error = True
+            while error:
+                # Set parallel data bus to value:
+                self.gpio.write( self.gpio.GPIOA, val)
+                sleep( self.i2c_delay )     # Wait for valid data at gpio expander.
+                # Send strobe pulse.
+                valB = 0b11111111
+                if ( self._hard_autofeed):
+                    valB ^= (0b1 << self._AUTOFEED)
+                self.gpio.write( self.gpio.GPIOB, valB)
+                sleep( self.strobe_duration)
+                valB ^= (0b1 << self._STROBE)
+                self.gpio.write( self.gpio.GPIOB, valB)
+                # Wait for the printer to be ready again.
+                ready = False
+                while (not ready):
+                    sleep( self.busy_polling_delay)
+                    stt = self.status()
+                    if ( (stt['PAPEREND'] == 1) or (stt['SELECT'] == 0) or (stt['ERROR'] == 0)):
+                        print("Error(s) encountered by the printer:")
+                        if (stt['PAPEREND'] == 1):
+                            print("Out of paper.")
+                        if (stt['SELECT'] == 0):
+                            print("Printer not selected.")
+                        if (stt['ERROR'] == 0):
+                            print("Printer error (maybe not online?).")
+                        action = input("Would you like to resume printing? (y/n):")
+                        if (action == 'n'):
+                            raise KeyboardInterrupt
+                        else:
+                            break
+                    if ( (stt['BUSY'] == 0) and (stt['ACK'] == 1)):
+                        ready = True
+                        error = False
 
     def status(self):
         """Returns the status of the printer by reading the

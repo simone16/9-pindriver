@@ -21,8 +21,11 @@ verbatim = False        # verbatim
 pa = ESCPdriver.ParallelAdapter()
 pa.reset_printer()
 pa.set_right_margin(65)
+pa.set_page_length_inches(12)
+pa.set_bottom_margin(4)
 pa.set_symbol_char_table()
 pa.set_autofeed_method( "soft")
+pa.set_pitch_12cpi()
 
 # Line parsing block:
 def readline( line):
@@ -59,33 +62,33 @@ def readline( line):
             while ( line[i+level] == '#'):
                 level += 1
             if (level == 1):
+                pa.set_pitch_10cpi()
                 pa.set_double_height()
                 pa.set_bold()
-                pa.set_interchar_space(20)
                 pa.set_line_spacing(60)
                 pa.write_string( "".join(line[i+level:]))
                 pa.unset_double_height()
                 pa.unset_bold()
-                pa.set_interchar_space(0)
                 pa.unset_line_spacing()
+                pa.set_pitch_12cpi()
             elif (level == 2):
+                pa.set_pitch_10cpi()
                 pa.set_double_height()
-                pa.set_interchar_space(20)
                 pa.set_line_spacing(60)
                 pa.write_string( "".join(line[i+level:]))
                 pa.unset_double_height()
-                pa.set_interchar_space(0)
                 pa.unset_line_spacing()
+                pa.set_pitch_12cpi()
             elif (level == 3):
-                pa.set_interchar_space(20)
+                pa.set_pitch_10cpi()
                 pa.set_bold()
                 pa.write_string( "".join(line[i+level:]))
                 pa.unset_bold()
-                pa.set_interchar_space(0)
+                pa.set_pitch_12cpi()
             else:
-                pa.set_interchar_space(20)
+                pa.set_pitch_10cpi()
                 pa.write_string( "".join(line[i+level:]))
-                pa.set_interchar_space(0)
+                pa.set_pitch_12cpi()
             i += level - 1
             olist_index = 0
             return
