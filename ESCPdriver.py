@@ -277,6 +277,7 @@ class ParallelAdapter:
         """Set the position of consecutive tabs at n characters from left margin.
     n : int
         1 <= n <= 255, up to 32 tabs."""
+        n = list(n)
         n.sort()
         self.putchar( self.ESC, ord('D'), *n)
         self.putchar( self.NUL)
@@ -285,6 +286,7 @@ class ParallelAdapter:
         """Set the position of consecutive vertical tabs at n lines from top of form.
     n : int
         1 <= n <= 255, up to 16 tabs."""
+        n = list(n)
         n.sort()
         self.putchar( self.ESC, ord('B'), *n)
         self.putchar( self.NUL)
@@ -345,6 +347,100 @@ class ParallelAdapter:
     def unset_symbol_char_table(self):
         """Select the default char table (italics)."""
         self.putchar( self.ESC, ord('t'), 0)
+
+    def set_international_charset(self, n):
+        """Set the char table to one of the following:
+    n : int
+        n = 0 USA
+            1 France
+            2 Germany
+            3 United Kingdom
+            4 Denmark I
+            5 Sweden
+            6 Italy
+            7 Spain I
+            8 Japan (English)
+            9 Norway
+            10 Denmark II
+            11 Spain II
+            12 Latin America"""
+        self.putchar( self.ESC, ord('R'), n)
+
+    def define_draft_char(self, start_code, *glyphs):
+        """Define custom characters in device RAM memory.
+    start_code : int
+        ASCII code to assign to first glyph defined, the code increases
+        by one for each additional gliph provided.
+    glyphs : ParallelAdapter.Glyph
+        Define glyphs data."""
+        end_code = start_code + len(glyphs) - 1
+        self.putchar( self.ESC, ord('&'), self.NUL, start_code, end_code)
+        for glyph in glyphs:
+            self.putchar( glyph._a, *(glyph.data))
+
+    def define_NLQ_char(self, start_code, *glyphs):
+        """Define custom characters in device RAM memory.
+    start_code : int
+        ASCII code to assign to first glyph defined, the code increases
+        by one for each additional gliph provided.
+    glyphs : ParallelAdapter.Glyph
+        Define glyphs data."""
+        end_code = start_code + len(glyphs) - 1
+        self.putchar( self.ESC, ord('&'), self.NUL, start_code, end_code, 0)
+        for glyph in glyphs:
+            self.putchar( len(glyph.data)/3, 0, *(glyph.data))
+
+    def roman_to_RAM(self):
+        """Copies the roman charset to the RAM memory of the device."""
+        self.putchar( self.ESC, ord(':'), self.NUL, 0, 0)
+
+    def sansserif_to_RAM(self):
+        """Copies the sans serif charset to the RAM memory of the device."""
+        self.putchar( self.ESC, ord(':'), self.NUL, 1, 0)
+
+    def set_RAM_char_table(self):
+        """Set the source of the current char table to device's RAM."""
+        self.putchar( self.ESC, ord('%'), 1)
+
+    def unset_RAM_char_table(self):
+        """Set the source of the current char table to device's ROM (default)."""
+        self.putchar( self.ESC, ord('%'), 0)
+
+    class Glyph:
+        """Create objects of this class to define custom characters as
+    list of 8 bit values (columns from left to right) with LSB at the bottom.
+    A bit value of 1 is a black pixel."""
+        def __init__(self):
+            self.data = []
+            self._a = 1
+
+        def set_draft(self, before, after, upper):
+            """Set the glyph as draft type.
+        before : int
+            0 to 7, number of empty columns before char in proportional mode.
+        after : int
+            1 to 11, number of empty columns after char in proportional mode.
+        upper : bool
+            use the upper 8 pins of the head (default is bottom pins)."""
+            self._a = after
+            if (before == 0):
+                pass
+            elif( before == 1):
+                self._a += 16
+            elif( before == 2):
+                self._a += 32
+            elif( before == 3):
+                self._a += 48
+            elif( before == 4):
+                self._a += 64
+            elif( before == 5):
+                self._a += 80
+            elif( before == 6):
+                self._a += 96
+            else:
+                self._a += 112
+            if (upper):
+                self._a += 128
 
     def set_NLQ(self):
         """Select Near Letter Quality printing."""
@@ -468,6 +564,16 @@ class ParallelAdapter:
     def unset_print_control_codes(self):
         """Treat control codes as codes (default)."""
         self.putchar( self.ESC, ord('I'), 0)
+
+    def set_print_upper_control_codes(self):
+        """Treat codes from 128 to 159 as printable characters.
+        N.B. the default char table does not define gliphs for these codes
+    and the command is ignored."""
+        self.putchar( self.ESC, ord('6'))
+
+    def unset_print_upper_control_codes(self):
+        """Treat control codes 128 to 159 as codes (default)."""
+        self.putchar( self.ESC, ord('7'))
 
     def beep(self):
         """Beeps the printer for 1/10 of a second."""
